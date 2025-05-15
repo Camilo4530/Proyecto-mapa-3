@@ -1,0 +1,56 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+#mapa {
+  display: flex;
+  height: 100vh;
+}
+
+#map {
+  flex-grow: 1;
+}
+
+#panel, #panelRuta {
+  width: 300px;
+  padding: 1rem;
+  background: #f0f8ff;
+  border-right: 2px solid #ccc;
+  overflow-y: auto;
+}
+
+#panelRuta {
+  background: #fff5f5;
+}
+
+#panel h2, #panelRuta h2 {
+  margin-top: 0;
+  color: #004488;
+}
+
+button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  margin: 5px 0;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+button.activo {
+  background-color: #28a745;
+}
+
+ul, ol {
+  padding-left: 1.2em;
+}
+
+li {
+  margin-bottom: 0.5em;
+}
+
+
+
+

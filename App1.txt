@@ -1,0 +1,75 @@
+from flask import Flask, render_template, request, jsonify
+import osmnx as ox
+import networkx as nx
+
+app = Flask(__name__)
+
+# Carga el grafo de Bogotá
+G = ox.graph_from_place('Bogotá, Colombia', network_type='drive')
+
+# Lista para guardar nodos agregados (ID + Dirección)
+nodos_agregados = []
+
+@app.route('/')
+def index():
+    return render_template('index.html', nodos=nodos_agregados)
+
+@app.route('/buscar_ruta', methods=['POST'])
+def buscar_ruta():
+    origen = request.form['origen']
+    destino = request.form['destino']
+
+    origen_geocode = ox.geocode(origen)
+    destino_geocode = ox.geocode(destino)
+
+    crear_mapa(origen_geocode[0], origen_geocode[1], destino_geocode[0], destino_geocode[1])
+
+    return render_template('mostrar_mapa.html')
+
+@app.route('/editar_grafo', methods=['POST'])
+def editar_grafo():
+    accion = request.form['accion']
+    global nodos_agregados  # Asegurar que modificamos la lista global
+
+    if accion == 'agregar_nodo':
+        direccion = request.form['direccion']
+        try:
+            lat, lon = ox.geocode(direccion)
+            nuevo_id = max(G.nodes) + 1
+            G.add_node(nuevo_id, x=lon, y=lat)
+            nodos_agregados.append({'id': nuevo_id, 'direccion': direccion})
+        except Exception as e:
+            print(f"Error al agregar nodo: {e}")
+
+    elif accion == 'eliminar_nodo':
+        nodo_id = int(request.form['nodo'])
+        if nodo_id in G.nodes:
+            G.remove_node(nodo_id)
+            nodos_agregados = [nodo for nodo in nodos_agregados if nodo['id'] != nodo_id]
+
+    return render_template('index.html', nodos=nodos_agregados)
+
+# 🔥 NUEVA RUTA para autocompletar direcciones
+@app.route('/buscar_direcciones', methods=['GET'])
+def buscar_direcciones():
+    texto = request.args.get('q', '')
+    if not texto:
+        return jsonify([])
+    
+    try:
+        lugares = ox.geocode_to_gdf(texto + ", Bogotá, Colombia")
+        sugerencias = lugares['display_name'].tolist()
+        return jsonify(sugerencias[:5])  # Solo las 5 primeras sugerencias
+    except Exception as e:
+        print(f"Error en autocompletar: {e}")
+        return jsonify([])
+
+def crear_mapa(origen_lat, origen_lon, destino_lat, destino_lon):
+    pass
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+
+

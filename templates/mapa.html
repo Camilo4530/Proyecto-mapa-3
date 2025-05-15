@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mapa de Bogotá - Nodos</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="/static/estilo.css" />
+</head>
+<body>
+  <div id="mapa">
+    <div id="panel">
+      <h2>Nodos</h2>
+      <button id="modoAgregar">🔵 Señalar nodo</button>
+      <ul id="listaNodos"></ul>
+      <button id="calcularRuta">🧭 Calcular camino</button>
+    </div>
+
+    <div id="panelRuta">
+      <h2>Camino más corto</h2>
+      <ol id="listaRuta"></ol>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([4.6097, -74.0817], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let modoAgregar = false;
+    let nodos = [];
+    let letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let polilineas = [];
+
+    document.getElementById('modoAgregar').addEventListener('click', () => {
+      modoAgregar = !modoAgregar;
+      document.getElementById('modoAgregar').classList.toggle('activo');
+    });
+
+    map.on('click', function (e) {
+      if (!modoAgregar) return;
+
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      const letra = letras[nodos.length % letras.length];
+
+      const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${letra}</b><br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}`).openPopup();
+
+      nodos.push({ letra, lat, lng, marker });
+      actualizarListaNodos();
+      dibujarAristas();
+    });
+
+    function actualizarListaNodos() {
+      const lista = document.getElementById('listaNodos');
+      lista.innerHTML = '';
+      nodos.forEach((nodo, i) => {
+        const li = document.createElement('li');
+        li.textContent = `${nodo.letra}: Lat ${nodo.lat.toFixed(4)}, Lng ${nodo.lng.toFixed(4)}`;
+        const btn = document.createElement('button');
+        btn.textContent = '❌';
+        btn.onclick = () => {
+          map.removeLayer(nodo.marker);
+          nodos.splice(i, 1);
+          actualizarListaNodos();
+          dibujarAristas();
+        };
+        li.appendChild(btn);
+        lista.appendChild(li);
+      });
+    }
+
+    function dibujarAristas() {
+      polilineas.forEach(p => map.removeLayer(p));
+      polilineas = [];
+
+      for (let i = 0; i < nodos.length; i++) {
+        for (let j = i + 1; j < nodos.length; j++) {
+          const p = L.polyline([[nodos[i].lat, nodos[i].lng], [nodos[j].lat, nodos[j].lng]], { color: 'blue' }).addTo(map);
+          polilineas.push(p);
+        }
+      }
+    }
+
+    document.getElementById('calcularRuta').addEventListener('click', async () => {
+      const res = await fetch('/camino', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+         nodos: nodos.map(n => ({ lat: n.lat, lng: n.lng }))
+      })
+    });
+      const data = await res.json();
+      mostrarRuta(data.camino);
+    });
+
+    function mostrarRuta(camino) {
+      const lista = document.getElementById('listaRuta');
+      lista.innerHTML = '';
+
+      if (!camino.length) {
+        lista.innerHTML = '<li>No hay camino disponible</li>';
+        return;
+      }
+
+      const linea = L.polyline(camino.map(p => [p.lat, p.lng]), { color: 'red' }).addTo(map);
+      polilineas.push(linea);
+
+      camino.forEach((p, i) => {
+        const li = document.createElement('li');
+        li.textContent = `Paso ${i + 1}: Lat ${p.lat.toFixed(4)}, Lng ${p.lng.toFixed(4)}`;
+        lista.appendChild(li);
+      });
+    }
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
