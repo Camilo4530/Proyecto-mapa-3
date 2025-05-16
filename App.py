@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify , render_template 
 import osmnx as ox
 import networkx as nx
 import pickle
@@ -38,9 +38,14 @@ def calcular_camino():
     try:
         # Encuentra el nodo más cercano en el grafo para cada punto
         nodos_grafo = [
-            ox.distance.nearest_nodes(G, lon=float(n["lng"]), lat=float(n["lat"]))
-            for n in nodos
-        ]
+                        ox.distance.nearest_nodes(
+                            G,
+                            float(n["lng"]),   # X = longitud
+                            float(n["lat"])    # Y = latitud
+                        )
+                        for n in nodos
+                    ]
+
 
         print("🔍 Nodos más cercanos en el grafo:", nodos_grafo)
 
@@ -74,6 +79,13 @@ def calcular_camino():
         print("❌ Error general:", e)
         return jsonify({"error": "Error interno"}), 500
 
+@app.route("/", methods=["GET"])
+def mostrar_mapa():
+    return render_template("mapa.html")
+
+# @app.route("/mapa", methods=["GET"])
+# def mostrar_mapa1():
+#     return render_template("mostrar_mapa.html")
 
 if __name__ == "__main__":
     app.run(debug=True)

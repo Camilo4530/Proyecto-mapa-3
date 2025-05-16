@@ -2,28 +2,40 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Mapa de Bogotá - Nodos</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="/static/estilo.css" />
+  <title>UPS Navigator · Bogotá</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet/dist/leaflet.css"
+  />
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}" />
 </head>
 <body>
-  <div id="mapa">
-    <div id="panel">
-      <h2>Nodos</h2>
-      <button id="modoAgregar">🔵 Señalar nodo</button>
-      <ul id="listaNodos"></ul>
-      <button id="calcularRuta">🧭 Calcular camino</button>
-    </div>
+  <header>
+    <img src="{{ url_for('static', filename='ups.png') }}" alt="UPS Logo" />
+    <h1>UPS Navigator · Bogotá</h1>
+  </header>
 
-    <div id="panelRuta">
-      <h2>Camino más corto</h2>
-      <ol id="listaRuta"></ol>
+  <div id="mapa">
+    <!-- CONTROLES FLOTANTES -->
+    <div id="controls">
+      <div id="panel">
+        <h2>Mis Nodos</h2>
+        <button id="modoAgregar">🔵 Señalar nodo</button>
+        <ul id="listaNodos"></ul>
+      </div>
+      <div id="panelRuta">
+        <h2>Ruta Óptima</h2>
+        <button id="calcularRuta">🧭 Calcular camino</button>
+        <ol id="listaRuta"></ol>
+      </div>
     </div>
 
     <div id="map"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.polylineDecorator/1.7.0/leaflet.polylineDecorator.min.js"></script>
   <script>
     const map = L.map('map').setView([4.6097, -74.0817], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -40,15 +52,14 @@
       document.getElementById('modoAgregar').classList.toggle('activo');
     });
 
-    map.on('click', function (e) {
+    map.on('click', e => {
       if (!modoAgregar) return;
-
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
+      const { lat, lng } = e.latlng;
       const letra = letras[nodos.length % letras.length];
-
-      const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${letra}</b><br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}`).openPopup();
-
+      const marker = L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup(`<b>${letra}</b><br>Lat: ${lat.toFixed(4)}<br>Lng: ${lng.toFixed(4)}`)
+        .openPopup();
       nodos.push({ letra, lat, lng, marker });
       actualizarListaNodos();
       dibujarAristas();
@@ -59,7 +70,7 @@
       lista.innerHTML = '';
       nodos.forEach((nodo, i) => {
         const li = document.createElement('li');
-        li.textContent = `${nodo.letra}: Lat ${nodo.lat.toFixed(4)}, Lng ${nodo.lng.toFixed(4)}`;
+        li.textContent = `${nodo.letra}: ${nodo.lat.toFixed(4)}, ${nodo.lng.toFixed(4)}`;
         const btn = document.createElement('button');
         btn.textContent = '❌';
         btn.onclick = () => {
@@ -76,10 +87,12 @@
     function dibujarAristas() {
       polilineas.forEach(p => map.removeLayer(p));
       polilineas = [];
-
       for (let i = 0; i < nodos.length; i++) {
         for (let j = i + 1; j < nodos.length; j++) {
-          const p = L.polyline([[nodos[i].lat, nodos[i].lng], [nodos[j].lat, nodos[j].lng]], { color: 'blue' }).addTo(map);
+          const p = L.polyline(
+            [[nodos[i].lat, nodos[i].lng], [nodos[j].lat, nodos[j].lng]],
+            { color: 'blue' }
+          ).addTo(map);
           polilineas.push(p);
         }
       }
@@ -89,40 +102,87 @@
       const res = await fetch('/camino', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-         nodos: nodos.map(n => ({ lat: n.lat, lng: n.lng }))
-      })
-    });
+        body: JSON.stringify({ nodos: nodos.map(n => ({ lat: n.lat, lng: n.lng })) })
+      });
       const data = await res.json();
-      mostrarRuta(data.camino);
+      mostrarRuta(data.camino || []);
     });
+
+    // Calcula el bearing entre dos puntos (en grados)
+function calcularBearing(lat1, lon1, lat2, lon2) {
+  // convierte a radianes
+  const toRad = d => d * Math.PI / 180;
+  const toDeg = d => d * 180 / Math.PI;
+
+  const φ1 = toRad(lat1), φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) -
+            Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  let θ = toDeg(Math.atan2(y, x)); // −180 … +180
+  return (θ + 360) % 360;          // 0 … 360°
+}
+
+// Convierte bearing (0–360) a dirección cardinal de 16 puntos
+function bearingACardinal(b) {
+  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE",
+                "S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  const idx = Math.round(b/22.5) % 16;
+  return dirs[idx];
+}
+
 
     function mostrarRuta(camino) {
-      const lista = document.getElementById('listaRuta');
-      lista.innerHTML = '';
+  const lista = document.getElementById('listaRuta');
+  lista.innerHTML = '';
+  if (!camino.length) {
+    lista.innerHTML = '<li>No hay camino disponible</li>';
+    return;
+  }
 
-      if (!camino.length) {
-        lista.innerHTML = '<li>No hay camino disponible</li>';
-        return;
-      }
+  // limpia flechas anteriores
+  polilineas.forEach(p => map.removeLayer(p));
+  polilineas = [];
 
-      const linea = L.polyline(camino.map(p => [p.lat, p.lng]), { color: 'red' }).addTo(map);
-      polilineas.push(linea);
+  // dibuja ruta dorada con flechas frecuentes
+  const routeColor = '#FFB500';
+  const linea = L.polyline(
+    camino.map(p => [p.lat, p.lng]),
+    { color: routeColor, weight: 6 }
+  ).addTo(map);
 
-      camino.forEach((p, i) => {
-        const li = document.createElement('li');
-        li.textContent = `Paso ${i + 1}: Lat ${p.lat.toFixed(4)}, Lng ${p.lng.toFixed(4)}`;
-        lista.appendChild(li);
-      });
+  const decorator = L.polylineDecorator(linea, {
+    patterns: [{
+      offset: 0,
+      repeat:  '10%',    // cada 10%
+      symbol:  L.Symbol.arrowHead({
+        pixelSize: 8,
+        pathOptions: { fillOpacity: 1, stroke: false, color: routeColor }
+      })
+    }]
+  }).addTo(map);
+
+  polilineas.push(linea, decorator);
+
+  // Lista pasos con dirección
+  camino.forEach((p, i) => {
+    const li = document.createElement('li');
+    let texto = `Paso ${i+1}: Lat ${p.lat.toFixed(4)}, Lng ${p.lng.toFixed(4)}`;
+
+    if (i < camino.length - 1) {
+      // calcula bearing al siguiente punto
+      const next = camino[i+1];
+      const b = calcularBearing(p.lat, p.lng, next.lat, next.lng);
+      const dir = bearingACardinal(b);
+      texto = `Paso ${i+1} → ${dir} (${b.toFixed(0)}°): ` +
+              `Lat ${p.lat.toFixed(4)}, Lng ${p.lng.toFixed(4)}`;
     }
+    li.textContent = texto;
+    lista.appendChild(li);
+  });
+}
+
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
