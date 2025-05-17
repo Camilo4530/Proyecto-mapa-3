@@ -137,3 +137,31 @@ ul, ol {
 li {
   margin-bottom: 0.5em;
 }
+
+.step-icon div {
+  background: var(--ups-gold);
+  color: var(--ups-brown);
+  border: 2px solid var(--ups-brown);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+/* marcador de nodo con número */
+.node-icon div {
+  background: var(--ups-gold);
+  color: var(--ups-brown);
+  border: 2px solid var(--ups-brown);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  font-weight: bold;
+  pointer-events: none;
+}
+
